@@ -660,6 +660,17 @@ function OrganizerDashboard() {
       .catch(() => setAppStatus('approved'));
   }, []);
 
+
+// จัดกลุ่มล็อคตามค่า stall.zone (หรือดึงจากตัวอักษรตัวแรก เช่น A, B)
+const groupedStalls = stalls.reduce((groups, stall) => {
+  const zone = stall.zone || (stall.lock_number ? stall.lock_number[0] : 'ทั่วไป');
+  if (!groups[zone]) {
+    groups[zone] = [];
+  }
+  groups[zone].push(stall);
+  return groups;
+}, {});
+
   return (
     <div style={styles.page}>
 
@@ -934,6 +945,7 @@ function OrganizerDashboard() {
         )}
 
         {/* ── 🟢 TAB: STALLS (กู้คืน Grid ล็อคและดีไซน์สมบูรณ์) ── */}
+        {/* ── 🟢 TAB: STALLS (แยกกรอบตามโซน A / B) ── */}
         {tab === 'stalls' && (
           <div style={styles.card}>
             <h2 style={styles.sectionTitle}>ผังพื้นที่และราคา</h2>
@@ -943,39 +955,72 @@ function OrganizerDashboard() {
               <div style={styles.emptyBox}>
                 <p style={styles.emptyText}>ยังไม่มีตลาด กรุณาสร้างตลาดก่อน</p>
               </div>
-            ) : markets.map(m => (
-              <div key={m.id} style={styles.stallSection}>
-                <div style={styles.stallHeader}>
-                  <div style={styles.stallThumb}>🏪</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={styles.stallMarketName}>{m.name}</div>
-                    <div style={styles.stallCount}>{stalls.filter(s => s.market_id === m.id).length} UNITS</div>
-                  </div>
-                  <button style={styles.addStallBtn} onClick={() => { setSelectedMarket(m); setShowAddStall(true); fetchStalls(m.id); }}>
-                    + เพิ่มล็อค
-                  </button>
-                  <button style={styles.manageBtn} onClick={() => { setSelectedMarket(m); fetchStalls(m.id); fetchPayments(m.id); }}>
-                    ✏️ จัดการล็อค
-                  </button>
-                </div>
+            ) : markets.map(m => {
+              const marketStalls = stalls.filter(s => s.market_id === m.id);
+              // จัดกลุ่มล็อคตามโซนของตลาดนี้
+              const grouped = marketStalls.reduce((groups, stall) => {
+                const zone = stall.zone || (stall.lock_number ? stall.lock_number[0] : 'ทั่วไป');
+                if (!groups[zone]) groups[zone] = [];
+                groups[zone].push(stall);
+                return groups;
+              }, {});
 
-                <div style={styles.stallGrid}>
-                  {stalls.filter(s => s.market_id === m.id).map(s => (
-                    <div key={s.id} style={styles.stallChipWrap}>
-                      <div style={styles.stallChip}>
-                        <div style={styles.stallChipName}>{s.lock_number}</div>
-                        <div style={styles.stallChipPrice}>฿{s.price_per_day}</div>
-                      </div>
-                      <div style={styles.stallChipBtns}>
-                        <button style={styles.stallEditBtn} onClick={() => { setEditStall({ ...s }); setShowEditStall(true); }}>✏️</button>
-                        <button style={styles.stallDeleteBtn} onClick={() => deleteStall(s.id)}>🗑️</button>
-                      </div>
+              return (
+                <div key={m.id} style={styles.stallSection}>
+                  <div style={styles.stallHeader}>
+                    <div style={styles.stallThumb}>🏪</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={styles.stallMarketName}>{m.name}</div>
+                      <div style={styles.stallCount}>{marketStalls.length} UNITS</div>
                     </div>
-                  ))}
-                  <div style={styles.stallAddChip} onClick={() => { setSelectedMarket(m); setShowAddStall(true); }}>+</div>
+                    <button style={styles.addStallBtn} onClick={() => { setSelectedMarket(m); setShowAddStall(true); fetchStalls(m.id); }}>
+                      + เพิ่มล็อค
+                    </button>
+                    <button style={styles.manageBtn} onClick={() => { setSelectedMarket(m); fetchStalls(m.id); fetchPayments(m.id); }}>
+                      ✏️ จัดการล็อค
+                    </button>
+                  </div>
+
+                  {Object.keys(grouped).length === 0 ? (
+                    <p style={{ color: '#999', fontSize: '13px' }}>ยังไม่มีล็อคในตลาดนี้</p>
+                  ) : (
+                    Object.entries(grouped)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([zoneName, zoneStalls]) => (
+                        <div key={zoneName} style={styles.zoneBox}>
+                          <div style={styles.zoneHeader}>
+                            <span style={styles.zoneBadge}>Zone {zoneName}</span>
+                            <span style={styles.zoneCount}>
+                              ทั้งหมด {zoneStalls.length} ล็อค • ราคา ฿{zoneStalls[0]?.price_per_day} / วัน
+                            </span>
+                          </div>
+
+                          <div style={styles.stallGrid}>
+                            {zoneStalls.map(s => (
+                              <div key={s.id} style={styles.stallChipWrap}>
+                                <div style={styles.stallChip}>
+                                  <div style={styles.stallChipName}>{s.lock_number}</div>
+                                  <div style={styles.stallChipPrice}>฿{s.price_per_day}</div>
+                                </div>
+                                <div style={styles.stallChipBtns}>
+                                  <button style={styles.stallEditBtn} onClick={() => { setEditStall({ ...s }); setShowEditStall(true); }}>✏️</button>
+                                  <button style={styles.stallDeleteBtn} onClick={() => deleteStall(s.id)}>🗑️</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                  )}
+
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ ...styles.stallAddChip, width: '100%', height: '42px', fontSize: '14px', gap: '6px' }} onClick={() => { setSelectedMarket(m); setShowAddStall(true); }}>
+                      ＋ เพิ่มล็อคใหม่ในตลาดนี้
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -2460,6 +2505,10 @@ const styles = {
   reopenBtn: { padding:'5px 12px', backgroundColor:'#1a7a4a', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'11px', fontWeight:'700' },
   closeMarketBtn: { padding:'5px 12px', backgroundColor:'#fff', color:'#f39c12', border:'1px solid #f39c12', borderRadius:'4px', cursor:'pointer', fontSize:'11px' },
 
+  zoneBox: { backgroundColor: '#fcfdfc', border: '1.5px solid #eef2ef', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
+  zoneHeader: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px dashed #e0e8e3' },
+  zoneBadge: { backgroundColor: '#1a7a4a', color: '#fff', fontSize: '12px', fontWeight: '800', padding: '3px 12px', borderRadius: '20px' },
+  zoneCount: { fontSize: '12px', color: '#666', fontWeight: '600' },
   /* 🟢 สไตล์ส่วนจัดการล็อคที่ถูกกู้คืน */
   stallSection:    { marginBottom:'20px', border:'1px solid #eee', borderRadius:'12px', padding:'16px' },
   stallHeader:     { display:'flex', alignItems:'center', gap:'12px', marginBottom:'14px' },

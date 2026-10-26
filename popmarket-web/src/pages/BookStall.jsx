@@ -267,6 +267,16 @@ function BookStall() {
     setLoading(false);
   };
 
+  // จัดกลุ่มล็อคตาม stall.zone หรือตัวอักษรแรกของชื่อล็อค (A, B)
+const groupedStalls = stalls.reduce((groups, stall) => {
+  const zoneKey = stall.zone || (stall.lock_number ? stall.lock_number.charAt(0).toUpperCase() : 'ทั่วไป');
+  if (!groups[zoneKey]) {
+    groups[zoneKey] = [];
+  }
+  groups[zoneKey].push(stall);
+  return groups;
+}, {});
+
   if (!market) return <div style={styles.loading}>กำลังโหลด...</div>;
 
   return (
@@ -459,6 +469,7 @@ function BookStall() {
               </div>
 
               {/* แผนที่ล็อค */}
+              {/* แผนที่ล็อค (แยกตามโซน A / B) */}
               <div style={styles.card}>
                 <div style={styles.cardHeader}>
                   <div>
@@ -474,47 +485,60 @@ function BookStall() {
                 {stalls.length === 0 ? (
                   <p style={{color:'#999'}}>ยังไม่มีล็อคในตลาดนี้</p>
                 ) : (
-                  <div style={styles.stallMap}>
-                    {stalls.map(s => {
-                      const bookedInfo = bookedStalls.find(b => b.stall_id === s.id || b.lock_number === s.lock_number);
-                      const isBooked = !!bookedInfo;
-                      
-                      const isSelected = bookingType === 'daily' 
-                        ? (daySelections[activeDate]?.id === s.id)
-                        : (subStall?.id === s.id);
-
-                      return (
-                        <div
-                          key={s.id}
-                          style={{
-                            ...styles.stallMapItem,
-                            backgroundColor: isBooked ? '#ffebee' : isSelected ? '#1a7a4a' : '#e8f5e9',
-                            color: isBooked ? '#c0392b' : isSelected ? '#fff' : '#1a7a4a',
-                            border: isBooked ? '1.5px solid #e74c3c' : isSelected ? '2px solid #1a7a4a' : '1px solid #c8e6c9',
-                            cursor: 'pointer',
-                            opacity: isBooked ? 0.95 : 1,
-                          }}
-                          onClick={() => {
-                            if (isBooked) {
-                              setInspectShop(bookedInfo);
-                            } else {
-                              handleSelectStall(s);
-                            }
-                          }}
-                          title={isBooked ? `จองแล้วโดย: ${bookedInfo.shop_name}` : `เลือกล็อค ${s.lock_number}`}
-                        >
-                          <div style={styles.stallMapName}>{s.lock_number}</div>
-                          {isBooked ? (
-                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#c0392b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-                              🔒 {bookedInfo.shop_name || 'จองแล้ว'}
-                            </div>
-                          ) : (
-                            <div style={styles.stallMapPrice}>฿{s.price_per_day}</div>
-                          )}
+                  Object.entries(groupedStalls)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([zoneName, zoneStalls]) => (
+                      <div key={zoneName} style={styles.zoneSection}>
+                        <div style={styles.zoneHeader}>
+                          <span style={styles.zoneBadge}>📍 โซน {zoneName}</span>
+                          <span style={styles.zonePrice}>
+                            ฿{Number(zoneStalls[0]?.price_per_day || 0).toLocaleString()} / วัน ({zoneStalls.length} ล็อค)
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        <div style={styles.stallMap}>
+                          {zoneStalls.map(s => {
+                            const bookedInfo = bookedStalls.find(b => b.stall_id === s.id || b.lock_number === s.lock_number);
+                            const isBooked = !!bookedInfo;
+                            
+                            const isSelected = bookingType === 'daily' 
+                              ? (daySelections[activeDate]?.id === s.id)
+                              : (subStall?.id === s.id);
+
+                            return (
+                              <div
+                                key={s.id}
+                                style={{
+                                  ...styles.stallMapItem,
+                                  backgroundColor: isBooked ? '#ffebee' : isSelected ? '#1a7a4a' : '#e8f5e9',
+                                  color: isBooked ? '#c0392b' : isSelected ? '#fff' : '#1a7a4a',
+                                  border: isBooked ? '1.5px solid #e74c3c' : isSelected ? '2px solid #1a7a4a' : '1px solid #c8e6c9',
+                                  cursor: 'pointer',
+                                  opacity: isBooked ? 0.95 : 1,
+                                }}
+                                onClick={() => {
+                                  if (isBooked) {
+                                    setInspectShop(bookedInfo);
+                                  } else {
+                                    handleSelectStall(s);
+                                  }
+                                }}
+                                title={isBooked ? `จองแล้วโดย: ${bookedInfo.shop_name}` : `เลือกล็อค ${s.lock_number}`}
+                              >
+                                <div style={styles.stallMapName}>{s.lock_number}</div>
+                                {isBooked ? (
+                                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#c0392b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                                    🔒 {bookedInfo.shop_name || 'จองแล้ว'}
+                                  </div>
+                                ) : (
+                                  <div style={styles.stallMapPrice}>฿{s.price_per_day}</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
                 )}
 
                 <div style={styles.legend}>
@@ -1083,6 +1107,10 @@ const styles = {
   backStepBtn: { width: '100%', padding: '10px', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#666', marginTop: '8px' },
   footer: { textAlign:'center', padding:'16px', fontSize:'11px', color:'#bbb', borderTop:'1px solid #eee', backgroundColor:'#fff', marginTop:'40px' },
   marketPhotoImg: { width:'100%', height:'auto', borderRadius:'8px', display:'block' },
+  zoneSection: { backgroundColor: '#fbfcfd', border: '1.5px solid #edf2f7', borderRadius: '12px', padding: '14px', marginBottom: '16px' },
+  zoneHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px dashed #e2e8f0' },
+  zoneBadge: { backgroundColor: '#e8f5e9', color: '#1a7a4a', fontWeight: '700', fontSize: '13px', padding: '3px 12px', borderRadius: '20px' },
+  zonePrice: { fontSize: '12px', color: '#666', fontWeight: '600' },
 };
 
 export default BookStall;

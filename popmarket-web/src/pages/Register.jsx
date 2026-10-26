@@ -3,6 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import ImageUpload from '../components/ImageUpload';
 
+// 🟢 ประกาศไว้นอกฟังก์ชัน Register ให้ดอกจันเป็นสีแดงสดและตัวหนา
+const Req = () => (
+  <span style={{ color: '#e74c3c', fontWeight: '800', marginLeft: '3px' }}>*</span>
+);
+
 function Register() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('shopper');
@@ -56,7 +61,7 @@ function Register() {
     setError('');
     const nameRegex = /^[a-zA-Z\u0E00-\u0E7F\s]+$/;
     const phoneRegex = /^0[0-9]{9}$/;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // 🟢 ตรวจสอบว่ามี @ และโดเมนถูกต้อง
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (activeTab === 'shopper') {
       const { firstName, lastName, phone, email, password, confirm } = shopperForm;
@@ -64,10 +69,7 @@ function Register() {
       if (!nameRegex.test(firstName.trim())) { setError('ชื่อจริงต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (lastName.trim() && !nameRegex.test(lastName.trim())) { setError('นามสกุลต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (!phone || !phoneRegex.test(phone.trim())) { setError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก และขึ้นต้นด้วยเลข 0 เท่านั้น'); return false; }
-      
-      // 🟢 ตรวจสอบอีเมล
       if (!emailRegex.test(email.trim())) { setError('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @ เช่น example@email.com)'); return false; }
-
       if (password.length < 6) { setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); return false; }
       if (password !== confirm) { setError('รหัสผ่านไม่ตรงกัน'); return false; }
 
@@ -77,10 +79,7 @@ function Register() {
       if (!nameRegex.test(firstName.trim())) { setError('ชื่อจริงเจ้าของร้านต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (lastName.trim() && !nameRegex.test(lastName.trim())) { setError('นามสกุลต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (!phoneRegex.test(phone.trim())) { setError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก และขึ้นต้นด้วยเลข 0 เท่านั้น'); return false; }
-      
-      // 🟢 ตรวจสอบอีเมล
       if (!emailRegex.test(email.trim())) { setError('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @ เช่น contact@shop.com)'); return false; }
-
       if (password.length < 6) { setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); return false; }
       if (password !== confirm) { setError('รหัสผ่านไม่ตรงกัน'); return false; }
 
@@ -90,10 +89,7 @@ function Register() {
       if (!nameRegex.test(firstName.trim())) { setError('ชื่อจริงต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (lastName.trim() && !nameRegex.test(lastName.trim())) { setError('นามสกุลต้องเป็นตัวอักษรเท่านั้น ห้ามมีตัวเลขหรือสัญลักษณ์พิเศษ'); return false; }
       if (!phoneRegex.test(phone.trim())) { setError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก และขึ้นต้นด้วยเลข 0 เท่านั้น'); return false; }
-      
-      // 🟢 ตรวจสอบอีเมล
       if (!emailRegex.test(email.trim())) { setError('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @ เช่น organizer@email.com)'); return false; }
-
       if (password.length < 6) { setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); return false; }
       if (password !== confirm) { setError('รหัสผ่านไม่ตรงกัน'); return false; }
 
@@ -269,7 +265,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>ชื่อ *</label>
+                  <label style={styles.label}>ชื่อ <Req /></label>
                   <input style={styles.input} placeholder="ชื่อจริง"
                     value={shopperForm.firstName}
                     onChange={e => setShopperForm({...shopperForm, firstName: e.target.value})} />
@@ -284,7 +280,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>เบอร์โทรศัพท์ *</label>
+                  <label style={styles.label}>เบอร์โทรศัพท์ <Req /></label>
                   <input 
                     style={styles.input} 
                     placeholder="0xx-xxx-xxxx"
@@ -297,7 +293,7 @@ function Register() {
                   />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>อีเมล *</label>
+                  <label style={styles.label}>อีเมล <Req /></label>
                   <input 
                     style={styles.input} 
                     type="email"
@@ -311,14 +307,14 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>รหัสผ่าน *</label>
+                  <label style={styles.label}>รหัสผ่าน <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={shopperForm.password}
                     onChange={e => setShopperForm({...shopperForm, password: e.target.value})} />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>ยืนยันรหัส *</label>
+                  <label style={styles.label}>ยืนยันรหัส <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={shopperForm.confirm}
@@ -343,7 +339,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>ชื่อจริงเจ้าของร้าน *</label>
+                  <label style={styles.label}>ชื่อจริงเจ้าของร้าน <Req /></label>
                   <input style={styles.input} placeholder="ชื่อจริง"
                     value={vendorForm.firstName}
                     onChange={e => setVendorForm({...vendorForm, firstName: e.target.value})} />
@@ -358,7 +354,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>เบอร์โทรศัพท์ *</label>
+                  <label style={styles.label}>เบอร์โทรศัพท์ <Req /></label>
                   <input 
                     style={styles.input} 
                     placeholder="0xx-xxx-xxxx"
@@ -371,7 +367,7 @@ function Register() {
                   />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>อีเมล *</label>
+                  <label style={styles.label}>อีเมล <Req /></label>
                   <input 
                     style={styles.input} 
                     type="email"
@@ -385,14 +381,14 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>รหัสผ่าน *</label>
+                  <label style={styles.label}>รหัสผ่าน <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={vendorForm.password}
                     onChange={e => setVendorForm({...vendorForm, password: e.target.value})} />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>ยืนยันรหัส *</label>
+                  <label style={styles.label}>ยืนยันรหัส <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={vendorForm.confirm}
@@ -402,12 +398,12 @@ function Register() {
 
               <div style={styles.sectionDivider}>ข้อมูลร้านค้า</div>
 
-              <label style={styles.label}>ชื่อร้านค้า / แบรนด์ *</label>
+              <label style={styles.label}>ชื่อร้านค้า / แบรนด์ <Req /></label>
               <input style={styles.input} placeholder="เช่น: ข้าวแกงป้าแดง, Handmade by Ploy"
                 value={vendorForm.shopName}
                 onChange={e => setVendorForm({...vendorForm, shopName: e.target.value})} />
 
-              <label style={styles.label}>ประเภทสินค้า *</label>
+              <label style={styles.label}>ประเภทสินค้า <Req /></label>
               <select style={styles.input}
                 value={vendorForm.shopCategory}
                 onChange={e => setVendorForm({...vendorForm, shopCategory: e.target.value})}>
@@ -475,7 +471,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>ชื่อ *</label>
+                  <label style={styles.label}>ชื่อ <Req /></label>
                   <input style={styles.input} placeholder="ชื่อจริง"
                     value={orgForm.firstName}
                     onChange={e => setOrgForm({...orgForm, firstName: e.target.value})} />
@@ -490,7 +486,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>เลขบัตรประชาชน *</label>
+                  <label style={styles.label}>เลขบัตรประชาชน <Req /></label>
                   <input style={styles.input} placeholder="เลขบัตรประชาชน 13 หลัก"
                     maxLength={13}
                     value={orgForm.idCard}
@@ -500,7 +496,7 @@ function Register() {
                     }} />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>เบอร์โทรศัพท์ *</label>
+                  <label style={styles.label}>เบอร์โทรศัพท์ <Req /></label>
                   <input style={styles.input} placeholder="0xx-xxx-xxxx"
                     maxLength={10}
                     value={orgForm.phone}
@@ -532,7 +528,7 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>อีเมล *</label>
+                  <label style={styles.label}>อีเมล <Req /></label>
                   <input 
                     style={styles.input} 
                     type="email"
@@ -546,14 +542,14 @@ function Register() {
 
               <div style={styles.row}>
                 <div style={styles.col}>
-                  <label style={styles.label}>รหัสผ่าน *</label>
+                  <label style={styles.label}>รหัสผ่าน <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={orgForm.password}
                     onChange={e => setOrgForm({...orgForm, password: e.target.value})} />
                 </div>
                 <div style={styles.col}>
-                  <label style={styles.label}>ยืนยันรหัส *</label>
+                  <label style={styles.label}>ยืนยันรหัส <Req /></label>
                   <input style={styles.input} type="password" placeholder="••••••••"
                     autoComplete="new-password"
                     value={orgForm.confirm}
@@ -604,14 +600,14 @@ function Register() {
                     )}
                   </div>
 
-                  <label style={styles.label}>ชื่อตลาด / ชื่องาน *</label>
+                  <label style={styles.label}>ชื่อตลาด / ชื่องาน <Req /></label>
                   <input style={styles.input} placeholder="เช่น: ตลาดนัดสุขใจ, ถนนคนเดินท่าแพ, งานกาชาดประจำปี"
                     value={market.market_name}
                     onChange={e => handleMarketChange(idx, 'market_name', e.target.value)} />
 
                   <div style={styles.row}>
                     <div style={{ flex: 2 }}>
-                      <label style={styles.label}>ที่ตั้งของตลาด / พื้นที่จัดงาน *</label>
+                      <label style={styles.label}>ที่ตั้งของตลาด / พื้นที่จัดงาน <Req /></label>
                       <input style={styles.input} placeholder="เช่น ลาดกระบัง กรุงเทพมหานคร หรือ ลานหน้าที่ว่าการอำเภอ"
                         value={market.location}
                         onChange={e => handleMarketChange(idx, 'location', e.target.value)} />

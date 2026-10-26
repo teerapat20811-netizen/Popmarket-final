@@ -149,7 +149,8 @@ function VendorDashboard() {
       for (const file of files) {
         const formData = new FormData();
         formData.append('image', file);
-        const res = await fetch('http://localhost:5000/api/upload/shop', {
+       const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://popmarket-api.onrender.com';
+       const res = await fetch(`${API_URL}/api/upload/shop`,  {
           method: 'POST',
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           body: formData

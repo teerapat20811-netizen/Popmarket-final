@@ -177,7 +177,8 @@ function ShopDetail() {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  return `http://localhost:5000${url.startsWith('/') ? '' : '/'}${url}`;
+  const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://popmarket-api.onrender.com';
+  return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
   const categoryLabel = (cat) => ({

@@ -52,7 +52,8 @@ function ImageUpload({
       formData.append('image', file); // field name ต้องเป็น 'image'
 
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/upload/${type}`, {
+      const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://popmarket-api.onrender.com';
+      const res = await fetch(`${API_URL}/api/upload/${type}`,  {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

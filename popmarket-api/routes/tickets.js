@@ -1,17 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { sendNotification } = require('./notifications'); // 🟢 นำเข้าฟังก์ชันส่งกระดิ่งแจ้งเตือน
-
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
 
 // ========== 1. ดึงรายการ Ticket ทั้งหมด (สำหรับ Admin ในหน้า Support Hub) ==========
 router.get('/', authMiddleware, async (req, res) => {

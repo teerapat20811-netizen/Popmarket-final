@@ -1,16 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
-
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
 
 pool.query('ALTER TABLE reviews ADD COLUMN reply TEXT NULL').catch(() => {});
 pool.query('ALTER TABLE reviews ADD COLUMN reply_by VARCHAR(255) NULL').catch(() => {});

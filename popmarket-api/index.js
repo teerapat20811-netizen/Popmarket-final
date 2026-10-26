@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2/promise');
+const pool = require('./db');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config(); // ✅ โหลด .env
@@ -39,14 +39,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.set('io', io);
 
 // ✅ DB ใช้ .env แทน hardcode
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME || 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
+
 
 // ✅ Register routes ทั้งหมดอยู่ที่เดียวกัน เป็นระเบียบ
 app.use('/api/auth', authRoutes);

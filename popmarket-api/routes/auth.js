@@ -1,18 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
 
 // ========== REGISTER ==========
 router.post('/register', async (req, res) => {

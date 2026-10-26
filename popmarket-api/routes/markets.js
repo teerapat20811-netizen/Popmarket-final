@@ -1,16 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
+
 
 // ========== ✅ ตรวจสอบและอัปเดตสถานะตลาดเปิด/ปิดอัตโนมัติตาม market_schedule ==========
 const updateMarketStatusBySchedule = async () => {
@@ -209,7 +202,7 @@ router.post('/', authMiddleware, async (req, res) => {
     name, description, start_date, end_date, 
     open_time, close_time, address, province, lat, lng,
     cover_url, layout_url, parking_info, parking_url, has_parking, has_restroom,
-    parking_slots, restrooms, area_size, // 🟢 สิ่งอำนวยความสะดวกใหม่
+    parking_slots, restrooms, area_size,
     selected_dates 
   } = req.body; 
 
@@ -325,7 +318,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       lat, lng, status, is_featured,
       cover_url, layout_url, has_parking, parking_info, parking_url,
       has_restroom,
-      parking_slots, restrooms, area_size // 🟢 สิ่งอำนวยความสะดวกใหม่
+      parking_slots, restrooms, area_size
     } = req.body;
 
     await pool.query(
@@ -385,11 +378,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== ลบตลาด ==========
+// ========== 🗑️ ลบตลาด และข้อมูลลูกทั้งหมดแบบ Cascade (Transaction) ==========
 router.delete('/:id', authMiddleware, async (req, res) => {
+  const marketId = req.params.id;
+
+  const conn = await pool.getConnection();
   try {
-    const [markets] = await pool.query(
-      'SELECT * FROM markets WHERE id = ?', [req.params.id]
+    const [markets] = await conn.query(
+      'SELECT * FROM markets WHERE id = ?', [marketId]
     );
     if (markets.length === 0) {
       return res.status(404).json({ message: 'ไม่พบตลาดนี้' });
@@ -398,10 +394,50 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'ไม่ใช่เจ้าของตลาดนี้' });
     }
 
-    await pool.query('DELETE FROM markets WHERE id = ?', [req.params.id]);
-    res.json({ message: 'ลบตลาดสำเร็จ ✅' });
+    await conn.beginTransaction();
+
+    // 1. ดึง stall_id ทั้งหมดของตลาดนี้
+    const [stalls] = await conn.query('SELECT id FROM stalls WHERE market_id = ?', [marketId]);
+    const stallIds = stalls.map(s => s.id);
+
+    if (stallIds.length > 0) {
+      // 1.1 ลบ payments ที่ผูกกับ bookings หรือ subscriptions ของ stalls ในตลาดนี้
+      await conn.query(`
+        DELETE FROM payments 
+        WHERE booking_id IN (SELECT id FROM bookings WHERE stall_id IN (?))
+           OR subscription_id IN (SELECT id FROM subscriptions WHERE stall_id IN (?))
+      `, [stallIds, stallIds]).catch(() => {});
+
+      // 1.2 ลบ bookings และ subscriptions
+      await conn.query('DELETE FROM bookings WHERE stall_id IN (?)', [stallIds]);
+      await conn.query('DELETE FROM subscriptions WHERE stall_id IN (?)', [stallIds]).catch(() => {});
+
+      // 1.3 ลบ stalls ทั้งหมดของตลาด
+      await conn.query('DELETE FROM stalls WHERE market_id = ?', [marketId]);
+    }
+
+    // 2. ลบข้อมูลที่ผูกกับตลาดโดยตรง
+    await conn.query('DELETE FROM market_reviews WHERE market_id = ?', [marketId]).catch(() => {});
+    await conn.query('DELETE FROM market_schedule WHERE market_id = ?', [marketId]).catch(() => {});
+    await conn.query('DELETE FROM market_schedules WHERE market_id = ?', [marketId]).catch(() => {});
+    await conn.query('DELETE FROM fee_payments WHERE market_id = ?', [marketId]).catch(() => {});
+
+    // 3. ลบตลาดออกจากตาราง markets เป็นลำดับสุดท้าย
+    const [result] = await conn.query('DELETE FROM markets WHERE id = ?', [marketId]);
+
+    await conn.commit();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'ไม่พบตลาดนี้' });
+    }
+
+    res.json({ message: 'ลบตลาดและข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว ✅' });
   } catch (err) {
-    res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
+    await conn.rollback();
+    console.error('DELETE MARKET ERROR:', err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบตลาด', error: err.message });
+  } finally {
+    conn.release();
   }
 });
 
@@ -450,12 +486,11 @@ router.post('/:id/stalls/batch', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'ไม่ใช่เจ้าของตลาดนี้' });
     }
 
-    const { stalls } = req.body; // รับเป็น Array ของล็อคที่ Frontend คำนวณมาให้
+    const { stalls } = req.body;
     if (!Array.isArray(stalls) || stalls.length === 0) {
       return res.status(400).json({ message: 'ไม่มีข้อมูลล็อคที่จะสร้าง' });
     }
 
-    // แปลงข้อมูลให้อยู่ในรูปแบบสำหรับคำสั่ง Bulk Insert ของ MySQL
     const values = stalls.map(s => [
       req.params.id,
       s.lock_number,
@@ -487,26 +522,23 @@ router.get('/:id/stalls/available', async (req, res) => {
   }
 
   try {
-    // ✅ ของใหม่ (เพิ่ม 'rejected')
-const [stalls] = await pool.query(
-  `SELECT s.* FROM stalls s
-   WHERE s.market_id = ?
-   AND s.is_active = true
-   AND s.id NOT IN (
-     SELECT stall_id FROM bookings 
-     WHERE book_date = ? 
-     AND status NOT IN ('cancelled', 'expired', 'rejected')
-   )`,
-  [req.params.id, date]
-);
+    const [stalls] = await pool.query(
+      `SELECT s.* FROM stalls s
+       WHERE s.market_id = ?
+       AND s.is_active = true
+       AND s.id NOT IN (
+         SELECT stall_id FROM bookings 
+         WHERE book_date = ? 
+         AND status NOT IN ('cancelled', 'expired', 'rejected')
+       )`,
+      [req.params.id, date]
+    );
 
     res.json({ date, available_stalls: stalls });
   } catch (err) {
     res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
   }
 });
-
-// ========== 🟢 ดึงรายการล็อคที่ถูกจองแล้วตามวันที่ (พร้อมชื่อร้านและหมวดหมู่) ==========
 
 // ========== 🟢 ดึงรายการล็อคที่ถูกจองแล้วตามวันที่ (พร้อมชื่อร้านและหมวดหมู่) ==========
 router.get('/:id/booked-stalls', async (req, res) => {
@@ -534,7 +566,6 @@ router.get('/:id/booked-stalls', async (req, res) => {
     `;
     const params = [marketId];
 
-    // รองรับกรณีส่งชุดวันที่มาพร้อมกันหลายวัน เช่น dates=2026-10-04,2026-10-05
     if (dates) {
       const dateList = dates.split(',').map(d => d.trim()).filter(Boolean);
       if (dateList.length > 0) {
@@ -545,14 +576,12 @@ router.get('/:id/booked-stalls', async (req, res) => {
       query += ` AND DATE(b.book_date) = ?`;
       params.push(date);
     } else if (month) {
-      // 🟢 เพิ่มเงื่อนไขตัดวันที่ในอดีตออก (เช็คเฉพาะวันที่ >= วันปัจจุบัน)
       query += ` AND DATE_FORMAT(b.book_date, '%Y-%m') = ? AND DATE(b.book_date) >= CURDATE()`;
       params.push(month);
     }
 
     const [dailyBookings] = await pool.query(query, params);
 
-    // ตรวจสอบล็อคที่ถูกเหมาจ่ายรายเดือน (subscriptions)
     let subQuery = `
       SELECT 
         sub.stall_id,

@@ -1,17 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth'); // ปรับเส้นทาง middleware ตามตำแหน่งจริงในโปรเจกต์ของคุณ
 
 // สร้าง Pool เชื่อมต่อ MySQL ตามรูปแบบเดียวกับไฟล์อื่นในโปรเจกต์
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234', // ใช้รหัสผ่านฐานข้อมูลของคุณ
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
+
 
 // 1. API ส่งข้อความ (รองรับทั้งข้อความและรูปภาพ)
 router.post('/', authMiddleware, async (req, res) => {

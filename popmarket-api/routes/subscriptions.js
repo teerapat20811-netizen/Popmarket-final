@@ -1,12 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 
-const pool = mysql.createPool({
-  host: 'localhost', user: 'root', password: '1234',
-  database: 'popmarket', waitForConnections: true, connectionLimit: 10,
-});
 
 // vendor สมัคร subscription (ปรับให้รับยอดเงิน total_amount จากหน้าบ้านตามจริง)
 router.post('/', authMiddleware, async (req, res) => {

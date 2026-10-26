@@ -1,19 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { sendNotification } = require('./notifications');
 const promptpayQR = require('promptpay-qr');
 const qrcode = require('qrcode');
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
+
 
 // ========== อัปโหลดสลิป (vendor) ==========
 router.post('/', authMiddleware, async (req, res) => {

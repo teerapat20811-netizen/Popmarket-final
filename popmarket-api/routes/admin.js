@@ -1,16 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const mysql = require('mysql2/promise');
+const pool = require('../db');
 const authMiddleware = require('../middleware/auth');
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '1234',
-  database: 'popmarket',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
 
 // อนุญาตเฉพาะ admin
 const adminOnly = (req, res, next) => {
@@ -213,7 +205,7 @@ router.get('/applications', authMiddleware, adminOnly, async (req, res) => {
 
 // ========== 2. อนุมัติ/ปฏิเสธ คำขอ Organizer (+ คำนวณโควตาตลาด + แจ้งเตือน) ==========
 router.put('/applications/:id', authMiddleware, adminOnly, async (req, res) => {
-  const { action, admin_note } = req.body; // action: 'approve' หรือ 'reject'
+  const { action, admin_note } = req.body;
   const { id } = req.params;
 
   try {
@@ -224,7 +216,6 @@ router.put('/applications/:id', authMiddleware, adminOnly, async (req, res) => {
     const io = req.app.get('io');
 
     if (action === 'approve') {
-      // คำนวณจำนวนตลาดจาก markets_data เพื่อเพิ่มโควตาให้ User
       let quotaToAdd = 1;
       if (app.markets_data) {
         try {
@@ -237,7 +228,6 @@ router.put('/applications/:id', authMiddleware, adminOnly, async (req, res) => {
         }
       }
 
-      // ปรับสิทธิ์เป็น organizer และเพิ่มโควตาตลาด (market_quota)
       await pool.query(
         `UPDATE users 
          SET role = 'organizer', market_quota = COALESCE(market_quota, 0) + ? 
@@ -245,13 +235,11 @@ router.put('/applications/:id', authMiddleware, adminOnly, async (req, res) => {
         [quotaToAdd, app.user_id]
       );
 
-      // อัปเดตสถานะใบสมัคร
       await pool.query(
         `UPDATE applications SET status = 'approved', reject_reason = ? WHERE id = ?`,
         [admin_note || null, id]
       );
 
-      // แจ้งเตือนผู้ใช้แบบเรียลไทม์และลงตาราง notifications
       const notifMsg = `ใบสมัครของคุณได้รับการอนุมัติแล้ว! คุณได้รับโควตาสร้างตลาด ${quotaToAdd} แห่ง กรุณาเข้าสู่ระบบใหม่อีกครั้ง`;
       if (io) {
         io.to(`user_${app.user_id}`).emit('notification', {
@@ -392,7 +380,7 @@ router.get('/vendors/public/:id', async (req, res) => {
       LEFT JOIN payments p ON p.booking_id = b.id AND p.status = 'paid'
       LEFT JOIN stalls s ON b.stall_id = s.id
       LEFT JOIN markets m ON s.market_id = m.id
-      WHERE u.id = ? AND u.role = 'vendor'
+      WHERE u.role = 'vendor'
       GROUP BY u.id, vp.id
     `, [req.params.id]);
 
@@ -441,6 +429,99 @@ router.get('/vendors/public/:id', async (req, res) => {
     });
   } catch (err) { 
     res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message }); 
+  }
+});
+
+// ========== ลบผู้ใช้ และข้อมูลที่เกี่ยวข้องแบบ Cascade (สมบูรณ์) ==========
+router.delete('/users/:id', authMiddleware, adminOnly, async (req, res) => {
+  const userId = req.params.id;
+
+  if (Number(userId) === Number(req.user.id)) {
+    return res.status(403).json({ message: 'ไม่สามารถลบบัญชี Admin ที่กำลังใช้งานอยู่ได้' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1. ตรวจสอบว่าถ้าเป็น Organizer มีตลาดที่สร้างไว้หรือไม่
+    const [markets] = await conn.query('SELECT id FROM markets WHERE organizer_id = ?', [userId]);
+    const marketIds = markets.map(m => m.id);
+
+    if (marketIds.length > 0) {
+      // 1.1 ลบรีวิวของตลาดเหล่านี้
+      await conn.query('DELETE FROM market_reviews WHERE market_id IN (?)', [marketIds]);
+
+      // 1.2 ดึง stall_id ทั้งหมดของตลาดเหล่านี้
+      const [stalls] = await conn.query('SELECT id FROM stalls WHERE market_id IN (?)', [marketIds]);
+      const stallIds = stalls.map(s => s.id);
+
+      if (stallIds.length > 0) {
+        // ลบ payments ที่ผูกกับ bookings หรือ subscriptions ของ stalls
+        await conn.query(`
+          DELETE FROM payments 
+          WHERE booking_id IN (SELECT id FROM bookings WHERE stall_id IN (?))
+             OR subscription_id IN (SELECT id FROM subscriptions WHERE stall_id IN (?))
+        `, [stallIds, stallIds]);
+
+        // ลบ bookings และ subscriptions ใน stalls
+        await conn.query('DELETE FROM bookings WHERE stall_id IN (?)', [stallIds]);
+        await conn.query('DELETE FROM subscriptions WHERE stall_id IN (?)', [stallIds]);
+
+        // ลบ stalls ทั้งหมดของตลาด
+        await conn.query('DELETE FROM stalls WHERE market_id IN (?)', [marketIds]);
+      }
+
+      // 1.3 ลบข้อมูลอื่นๆ ที่ผูกกับตลาด
+      await conn.query('DELETE FROM market_schedules WHERE market_id IN (?)', [marketIds]);
+      await conn.query('DELETE FROM fee_payments WHERE market_id IN (?)', [marketIds]);
+      await conn.query('DELETE FROM markets WHERE id IN (?)', [marketIds]);
+    }
+
+    // 2. ลบประวัติค่าธรรมเนียมของผู้จัดตลาด
+    await conn.query('DELETE FROM fee_payments WHERE organizer_id = ?', [userId]);
+
+    // 3. ลบข้อมูลฝั่งร้านค้า (Vendor) และรีวิวร้าน
+    const [vp] = await conn.query('SELECT id FROM vendor_profiles WHERE user_id = ?', [userId]);
+    if (vp.length > 0) {
+      const vpIds = vp.map(v => v.id);
+      await conn.query('DELETE FROM reviews WHERE vendor_profile_id IN (?)', [vpIds]);
+      await conn.query('DELETE FROM posts WHERE vendor_profile_id IN (?)', [vpIds]).catch(() => {});
+      await conn.query('DELETE FROM vendor_profiles WHERE user_id = ?', [userId]);
+    }
+
+    // ลบโพสต์และเช็คอิน
+    await conn.query('DELETE FROM shop_posts WHERE vendor_id = ?', [userId]).catch(() => {});
+    await conn.query('DELETE FROM vendor_checkins WHERE vendor_id = ?', [userId]).catch(() => {});
+
+    // 4. ลบการเงินและการจองที่ผู้ใช้นี้เป็นคนทำรายการ
+    await conn.query('DELETE FROM payments WHERE vendor_id = ?', [userId]);
+    await conn.query('DELETE FROM bookings WHERE vendor_id = ?', [userId]);
+    await conn.query('DELETE FROM subscriptions WHERE vendor_id = ?', [userId]).catch(() => {});
+
+    // 5. ลบประวัติทั่วไปของผู้ใช้
+    await conn.query('DELETE FROM market_reviews WHERE reviewer_id = ?', [userId]);
+    await conn.query('DELETE FROM reviews WHERE reviewer_id = ?', [userId]);
+    await conn.query('DELETE FROM applications WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM support_tickets WHERE reporter_id = ?', [userId]);
+
+    // 6. ลบข้อมูลออกจากตาราง users เป็นลำดับสุดท้าย
+    const [result] = await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    await conn.commit();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'ไม่พบผู้ใช้งานนี้' });
+    }
+
+    res.json({ message: 'ลบผู้ใช้และข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว ✅' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('DELETE USER ERROR:', err);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบผู้ใช้', error: err.message });
+  } finally {
+    conn.release();
   }
 });
 
@@ -636,34 +717,6 @@ router.put('/pending-vendors/:id', authMiddleware, adminOnly, async (req, res) =
     res.json({ message: action === 'approve' ? 'อนุมัติสำเร็จ ✅' : 'ปฏิเสธแล้ว ❌' });
   } catch (err) {
     res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
-  }
-});
-
-// ========== ลบผู้ใช้ และข้อมูลที่เกี่ยวข้อง ==========
-router.delete('/users/:id', authMiddleware, adminOnly, async (req, res) => {
-  const userId = req.params.id;
-
-  if (Number(userId) === Number(req.user.id)) {
-    return res.status(403).json({ message: 'ไม่สามารถลบบัญชี Admin ที่กำลังใช้งานอยู่ได้' });
-  }
-
-  try {
-    await pool.query('DELETE FROM vendor_profiles WHERE user_id = ?', [userId]);
-    await pool.query('DELETE FROM applications WHERE user_id = ?', [userId]);
-    await pool.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
-    await pool.query('DELETE FROM support_tickets WHERE reporter_id = ?', [userId]);
-    await pool.query('DELETE FROM reviews WHERE reviewer_id = ?', [userId]);
-    await pool.query('DELETE FROM bookings WHERE vendor_id = ?', [userId]);
-
-    const [result] = await pool.query('DELETE FROM users WHERE id = ?', [userId]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'ไม่พบผู้ใช้งานนี้' });
-    }
-
-    res.json({ message: 'ลบผู้ใช้และข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว ✅' });
-  } catch (err) {
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบผู้ใช้', error: err.message });
   }
 });
 

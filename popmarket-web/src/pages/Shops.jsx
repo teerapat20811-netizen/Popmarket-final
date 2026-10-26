@@ -15,6 +15,15 @@ function Shops() {
   
   const location = useLocation(); // 🟢 ดึงข้อมูล URL ปัจจุบัน
 
+  const normalizeCategory = (cat) => {
+  if (!cat) return 'other';
+  const c = String(cat).toLowerCase().trim();
+  if (c === 'food' || c.includes('อาหาร') || c.includes('เครื่องดื่ม') || c.includes('drink')) return 'food';
+  if (c === 'handmade' || c.includes('งานฝีมือ') || c.includes('แฮนด์')) return 'handmade';
+  if (c === 'fashion' || c.includes('แฟชั่น') || c.includes('เสื้อผ้า')) return 'fashion';
+  return 'other';
+};
+
   // 🟢 เพิ่ม useEffect เพื่อดึงคำค้นหาจาก URL (เช่น ?search=ไก่ทอด) มาใส่ใน State ทันทีที่โหลดหน้าเว็บ
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -40,7 +49,7 @@ function Shops() {
         name: v.shop_name || v.name,
         phone: v.phone || 'ไม่ระบุเบอร์โทร',
         logo_url: v.logo_url || null,
-        category: v.category || ['food', 'handmade', 'fashion', 'other'][v.id % 4],
+        category: normalizeCategory(v.category) || ['food', 'handmade', 'fashion', 'other'][v.id % 4],
         rating: parseFloat(v.avg_rating || 0).toFixed(1),
         review_count: parseInt(v.review_count) || 0,
         desc: v.description || 'ยินดีต้อนรับสู่ร้านค้าของเรา',
@@ -59,7 +68,7 @@ function Shops() {
   const filteredShops = useMemo(() => {
     let result = [...shops];
     if (search) result = result.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
-    if (category !== 'all') result = result.filter(s => s.category === category);
+    if (category !== 'all') result = result.filter(s => normalizeCategory(s.category) === category);
     
     if (sortBy === 'rating') {
       result.sort((a, b) => {
@@ -89,8 +98,11 @@ function Shops() {
   }[cat] || '#999');
 
   const categoryLabel = (cat) => ({
-    food: '🍕 Food & Drink', handmade: '🎨 Handmade', fashion: '👗 Fashion', other: '🌿 Other'
-  }[cat] || cat);
+  food: '🍕 อาหาร & เครื่องดื่ม', 
+  handmade: '🎨 งานฝีมือ / Handmade', 
+  fashion: '👗 แฟชั่น & เสื้อผ้า', 
+  other: '🏷️ สินค้าทั่วไป'
+}[normalizeCategory(cat)] || '🏷️ สินค้าทั่วไป');
 
   return (
     <div style={styles.page}>

@@ -61,6 +61,16 @@ function MarketDetail() {
   // ===== 🔍 IMAGE MODAL STATE =====
   const [selectedImage, setSelectedImage] = useState(null);
 
+// ฟังก์ชันปรับคำหมวดหมู่ให้เป็นมาตรฐานเดียวกัน
+const normalizeCategory = (cat) => {
+  if (!cat) return 'other';
+  const c = String(cat).toLowerCase().trim();
+  if (c === 'food' || c.includes('อาหาร') || c.includes('เครื่องดื่ม') || c.includes('drink')) return 'food';
+  if (c === 'handmade' || c.includes('งานฝีมือ') || c.includes('แฮนด์')) return 'handmade';
+  if (c === 'fashion' || c.includes('แฟชั่น') || c.includes('เสื้อผ้า')) return 'fashion';
+  return 'other';
+};
+
   useEffect(() => { fetchMarket(); }, [id]);
 
   useEffect(() => {
@@ -494,16 +504,18 @@ function MarketDetail() {
                   ))}
                 </div>
 
-                {bookedStalls.filter(v => filterCategory === 'all' || v.category === filterCategory).length === 0 ? (
+                {/* 🟢 โค้ดใหม่ที่แปลงค่าก่อนเทียบ */}
+                  {bookedStalls.filter(v => filterCategory === 'all' || normalizeCategory(v.category) === filterCategory).length === 0 ? (
                   <div style={styles.emptyBox}>
                     <p style={styles.emptyEmoji}>🏪</p>
                     <p style={styles.emptyText}>ไม่พบร้านค้าในหมวดหมู่นี้</p>
                   </div>
                 ) : (
                   <div style={styles.vendorGrid}>
+                    {/* 🟢 โค้ดใหม่ */}
                     {bookedStalls
-                      .filter(v => filterCategory === 'all' || v.category === filterCategory)
-                      .map(v => {
+                    .filter(v => filterCategory === 'all' || normalizeCategory(v.category) === filterCategory)
+                    .map(v => {
                         const checkinLabel = getCheckinStatus(v);
                         return (
                           <div key={v.id} style={styles.vendorCard}>

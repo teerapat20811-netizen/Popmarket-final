@@ -25,10 +25,11 @@ function ImageUpload({ onUpload, onUploadSuccess, label = 'อัปโหลด
       const token = localStorage.getItem('token');
       
       // 🚀 เช็คว่าถ้าไม่มี Token (กำลังสมัครสมาชิก) หรือเป็นประเภทที่เปิดสาธารณะ ให้ใช้พาท /register/...
-     const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://popmarket-api.onrender.com';
-     const uploadPath = isRegistering 
-      ? `${API_URL}/api/upload/register/${type}` 
-      : `${API_URL}/api/upload/${type}`;
+      const isRegistering = !token;
+      const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://popmarket-api.onrender.com';
+      const uploadPath = isRegistering 
+        ? `${API_URL}/api/upload/register/${type}` 
+        : `${API_URL}/api/upload/${type}`;
 
       const headers = {
         'Content-Type': 'multipart/form-data',

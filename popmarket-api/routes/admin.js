@@ -362,7 +362,7 @@ router.get('/vendors/public', async (req, res) => {
   }
 });
 
-// ========== ดึงข้อมูล Vendor คนเดียว ==========
+// ========== ดึงข้อมูล Vendor คนเดียว (แก้ไขแล้ว) ==========
 router.get('/vendors/public/:id', async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -380,7 +380,7 @@ router.get('/vendors/public/:id', async (req, res) => {
       LEFT JOIN payments p ON p.booking_id = b.id AND p.status = 'paid'
       LEFT JOIN stalls s ON b.stall_id = s.id
       LEFT JOIN markets m ON s.market_id = m.id
-      WHERE u.role = 'vendor'
+      WHERE u.id = ?
       GROUP BY u.id, vp.id
     `, [req.params.id]);
 

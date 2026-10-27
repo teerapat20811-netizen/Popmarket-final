@@ -648,6 +648,7 @@ router.post('/fee-payments', authMiddleware, async (req, res) => {
   }
 });
 
+// 🟢 โค้ดใหม่ที่ใส่ Log เพื่อให้พ่น Error ออกหน้าจอดำ Render
 router.put('/fee-payments/:id/verify', authMiddleware, adminOnly, async (req, res) => {
   try {
     await pool.query(
@@ -656,6 +657,7 @@ router.put('/fee-payments/:id/verify', authMiddleware, adminOnly, async (req, re
     );
     res.json({ message: 'ยืนยันสำเร็จ ✅' });
   } catch (err) {
+    console.error('💥 VERIFY FEE ERROR:', err); // 👈 ใส่บรรทัดนี้ลงไปตรงนี้
     res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
   }
 });

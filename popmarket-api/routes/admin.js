@@ -648,16 +648,17 @@ router.post('/fee-payments', authMiddleware, async (req, res) => {
   }
 });
 
-// 🟢 โค้ดใหม่ที่ใส่ Log เพื่อให้พ่น Error ออกหน้าจอดำ Render
+
+// 🟢 โค้ดใหม่ที่ถูกต้อง (ส่ง 'paid' เป็นค่า Parameter)
 router.put('/fee-payments/:id/verify', authMiddleware, adminOnly, async (req, res) => {
   try {
     await pool.query(
-      'UPDATE fee_payments SET status = "paid" WHERE id = ?',
-      [req.params.id]
+      'UPDATE fee_payments SET status = ? WHERE id = ?',
+      ['paid', req.params.id]
     );
     res.json({ message: 'ยืนยันสำเร็จ ✅' });
   } catch (err) {
-    console.error('💥 VERIFY FEE ERROR:', err); // 👈 ใส่บรรทัดนี้ลงไปตรงนี้
+    console.error('💥 VERIFY FEE ERROR:', err);
     res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
   }
 });
